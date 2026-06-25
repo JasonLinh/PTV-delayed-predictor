@@ -1,0 +1,7 @@
+requests==2.31.0
+pandas==2.2.2
+schedule==1.2.1
+gtfs-realtime-bindings==1.0.0
+flask==3.0.3
+protobuf==4.25.3
+python-dotenv==1.0.0
