@@ -122,21 +122,28 @@ def get_alerts() -> dict:
 
 
 def get_weather() -> dict:
-    url = (
-        'https://api.open-meteo.com/v1/forecast'
-        '?latitude=-37.8136&longitude=144.9631'
-        '&current_weather=true'
-        '&hourly=precipitation,weathercode'
-        '&timezone=Australia%2FMelbourne'
-    )
-    data = requests.get(url, timeout=10).json()
-    hour = datetime.now().hour
-    return {
-        'temperature':   data['current_weather']['temperature'],
-        'windspeed':     data['current_weather']['windspeed'],
-        'weather_code':  data['current_weather']['weathercode'],
-        'precipitation': data['hourly']['precipitation'][hour],
-    }
+    try:
+        url = (
+            'https://api.open-meteo.com/v1/forecast'
+            '?latitude=-37.8136&longitude=144.9631'
+            '&current=temperature_2m,windspeed_10m,precipitation,weathercode'
+            '&timezone=Australia%2FMelbourne'
+        )
+        data = requests.get(url, timeout=10).json()
+        current = data['current']
+        return {
+            'temperature':   current['temperature_2m'],
+            'windspeed':     current['windspeed_10m'],
+            'weather_code':  current['weathercode'],
+            'precipitation': current['precipitation'],
+        }
+    except Exception:
+        return {
+            'temperature':   None,
+            'windspeed':     None,
+            'weather_code':  None,
+            'precipitation': None,
+        }
 
 
 def collect_snapshot():
