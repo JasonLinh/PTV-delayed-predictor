@@ -11,7 +11,6 @@ from datetime import datetime
 from google.transit import gtfs_realtime_pb2
 from flask import Flask
 
-# ── Config ────────────────────────────────────────────────────────────────────
 API_KEY = os.environ.get('PTV_API_KEY')
 
 FEEDS = {
@@ -28,7 +27,6 @@ FEEDS = {
 DATA_FILE = 'data/ptv_delays.csv'
 LOG_FILE  = 'data/collection_log.txt'
 
-# ── Flask keep-alive (required for Railway) ───────────────────────────────────
 app = Flask(__name__)
 
 @app.route('/')
@@ -39,12 +37,13 @@ def run_web():
     port = int(os.environ.get('PORT', 8080))
     app.run(host='0.0.0.0', port=port)
 
-# ── Data collection ───────────────────────────────────────────────────────────
 def get_delays(feed_url: str, snapshot_time: datetime) -> pd.DataFrame:
-    """Fetch GTFS-RT trip updates and return a flat DataFrame."""
     response = requests.get(
         feed_url,
-        headers={'Ocp-Apim-Subscription-Key': API_KEY},
+        headers={
+            'Ocp-Apim-Subscription-Key': API_KEY,
+            'KeyID': API_KEY,
+        },
         timeout=15,
     )
     response.raise_for_status()
@@ -57,9 +56,9 @@ def get_delays(feed_url: str, snapshot_time: datetime) -> pd.DataFrame:
         if not entity.HasField('trip_update'):
             continue
 
-        trip      = entity.trip_update
-        route_id  = trip.trip.route_id
-        trip_id   = trip.trip.trip_id
+        trip     = entity.trip_update
+        route_id = trip.trip.route_id
+        trip_id  = trip.trip.trip_id
 
         for stop_update in trip.stop_time_update:
             delay_secs = None
@@ -86,36 +85,61 @@ def get_delays(feed_url: str, snapshot_time: datetime) -> pd.DataFrame:
 
 
 def get_alerts() -> dict:
-    response = requests.get(
-        FEEDS['metro_alerts'],
-        headers={
-            'Ocp-Apim-Subscription-Key': API_KEY,
-            'KeyID': API_KEY
-        },
-        timeout=15,
+    try:
+        response = requests.get(
+            FEEDS['metro_alerts'],
+            headers={
+                'Ocp-Apim-Subscription-Key': API_KEY,
+                'KeyID': API_KEY,
+            },
+            timeout=15,
+        )
+        response.raise_for_status()
+
+        feed = gtfs_realtime_pb2.FeedMessage()
+        feed.ParseFromString(response.content)
+
+        effects = []
+        causes  = []
+        for entity in feed.entity:
+            if entity.HasField('alert'):
+                effects.append(entity.alert.effect)
+                causes.append(entity.alert.cause)
+
+        return {
+            'active_alerts':     len(effects),
+            'has_network_alert': 1 if len(effects) > 0 else 0,
+            'alert_effects':     ','.join(str(e) for e in effects) if effects else '',
+            'alert_causes':      ','.join(str(c) for c in causes) if causes else '',
+        }
+    except Exception:
+        return {
+            'active_alerts':     0,
+            'has_network_alert': 0,
+            'alert_effects':     '',
+            'alert_causes':      '',
+        }
+
+
+def get_weather() -> dict:
+    url = (
+        'https://api.open-meteo.com/v1/forecast'
+        '?latitude=-37.8136&longitude=144.9631'
+        '&current_weather=true'
+        '&hourly=precipitation,weathercode'
+        '&timezone=Australia%2FMelbourne'
     )
-    response.raise_for_status()
-
-    feed = gtfs_realtime_pb2.FeedMessage()
-    feed.ParseFromString(response.content)
-
-    effects = []
-    causes  = []
-    for entity in feed.entity:
-        if entity.HasField('alert'):
-            effects.append(entity.alert.effect)
-            causes.append(entity.alert.cause)
-
+    data = requests.get(url, timeout=10).json()
+    hour = datetime.now().hour
     return {
-        'active_alerts':     len(effects),
-        'has_network_alert': 1 if len(effects) > 0 else 0,
-        'alert_effects':     ','.join(str(e) for e in effects) if effects else '',
-        'alert_causes':      ','.join(str(c) for c in causes) if causes else '',
+        'temperature':   data['current_weather']['temperature'],
+        'windspeed':     data['current_weather']['windspeed'],
+        'weather_code':  data['current_weather']['weathercode'],
+        'precipitation': data['hourly']['precipitation'][hour],
     }
 
 
 def collect_snapshot():
-    """Single collection run: fetch delays, alerts, weather and append to CSV."""
     os.makedirs('data', exist_ok=True)
     now = datetime.now()
     print(f"[{now}] Collecting snapshot...")
@@ -149,7 +173,6 @@ def collect_snapshot():
             f.write(f"{now} — ERROR: {e}\n")
 
 
-# ── Entry point ───────────────────────────────────────────────────────────────
 if __name__ == '__main__':
     threading.Thread(target=run_web, daemon=True).start()
 
