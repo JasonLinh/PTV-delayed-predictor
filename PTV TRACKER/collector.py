@@ -86,10 +86,12 @@ def get_delays(feed_url: str, snapshot_time: datetime) -> pd.DataFrame:
 
 
 def get_alerts() -> dict:
-    """Fetch active service alerts and return summary fields."""
     response = requests.get(
         FEEDS['metro_alerts'],
-        headers={'Ocp-Apim-Subscription-Key': API_KEY},
+        headers={
+            'Ocp-Apim-Subscription-Key': API_KEY,
+            'KeyID': API_KEY
+        },
         timeout=15,
     )
     response.raise_for_status()
@@ -109,25 +111,6 @@ def get_alerts() -> dict:
         'has_network_alert': 1 if len(effects) > 0 else 0,
         'alert_effects':     ','.join(str(e) for e in effects) if effects else '',
         'alert_causes':      ','.join(str(c) for c in causes) if causes else '',
-    }
-
-
-def get_weather() -> dict:
-    """Fetch current Melbourne weather from Open-Meteo (free, no key needed)."""
-    url = (
-        'https://api.open-meteo.com/v1/forecast'
-        '?latitude=-37.8136&longitude=144.9631'
-        '&current_weather=true'
-        '&hourly=precipitation,weathercode'
-        '&timezone=Australia%2FMelbourne'
-    )
-    data = requests.get(url, timeout=10).json()
-    hour = datetime.now().hour
-    return {
-        'temperature':    data['current_weather']['temperature'],
-        'windspeed':      data['current_weather']['windspeed'],
-        'weather_code':   data['current_weather']['weathercode'],
-        'precipitation':  data['hourly']['precipitation'][hour],
     }
 
 
