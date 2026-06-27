@@ -131,13 +131,16 @@ def get_weather() -> dict:
         )
         data = requests.get(url, timeout=10).json()
         current = data['current']
-        return {
+        weather = {
             'temperature':   current['temperature_2m'],
             'windspeed':     current['windspeed_10m'],
             'weather_code':  current['weathercode'],
             'precipitation': current['precipitation'],
         }
-    except Exception:
+        print(f"  🌤 Weather: {weather['temperature']}°C, wind {weather['windspeed']}km/h, rain {weather['precipitation']}mm")
+        return weather
+    except Exception as e:
+        print(f"  ⚠️ Weather failed: {e}")
         return {
             'temperature':   None,
             'windspeed':     None,
