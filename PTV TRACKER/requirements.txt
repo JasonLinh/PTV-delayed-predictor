@@ -1,0 +1,7 @@
+requests
+pandas
+schedule
+gtfs-realtime-bindings
+flask
+protobuf
+python-dotenv

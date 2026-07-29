@@ -1,0 +1,9 @@
+﻿.env
+.idea/
+.venv/
+__pycache__/
+*.pyc
+PTV TRACKER/data/
+PTV TRACKER/*.pkl
+PTV TRACKER/*.csv
+*.png
